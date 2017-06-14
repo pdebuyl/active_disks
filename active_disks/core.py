@@ -26,69 +26,6 @@ def solve_x_v(f, v0, t):
     trajectory = odeint(local_f, x0v0, t)
     return trajectory[:,0].reshape((-1,1)), trajectory[:,1].reshape((-1,1))
 
-
-def pair_time(r, v, i1, i2, f):
-    r12 = r[i1] - r[i2]
-    v1 = v[i1]
-    unit_v1 = normalize(v1)
-    v2 = v[i2]
-    unit_v2 = normalize(v2)
-    v12 = v1-v2
-
-    radius = 0.5
-
-    criterion = np.dot(r12, v12)
-
-    if criterion >= 0:
-        return 0, 0, -1
-
-    w1 = cross_onez(v1)
-    w2 = cross_onez(v2)
-
-    t1 = -np.dot(w2, r12)/np.dot(w2, v1)
-    t2 = np.dot(w1, r12)/np.dot(w1, v2)
-
-    print(t1, t2)
-
-    t_max = max(t1, t2)
-    t = np.linspace(0, t_max, 2000)
-    dt = t[1]-t[0]
-
-    # solve the ode for the scalar velocities
-    x, v = solve_x_v(f, math.sqrt(v1[0]**2+v1[1]**2), t)
-
-    x1 = r[i1] + x*unit_v1
-    v1 = v*unit_v1
-
-    x, v = solve_x_v(f, math.sqrt(v2[0]**2+v2[1]**2), t)
-
-    x2 = r[i2] + x*unit_v2
-    v2 = v*unit_v2
-
-    r12 = x1 - x2
-    r12_norm = np.sqrt(np.sum(r12**2, axis=1))
-    v12 = v1 - v2
-
-    r12_dot = np.sum(r12*v12, axis=1) / r12_norm
-
-    r12_dot_spline = make_interp_spline(t, r12_dot, k=3)
-    roots = sproot(r12_dot_spline)
-    collision_time = 0
-    if len(roots)>0:
-        if len(roots)!=1:
-            raise Exception('More than one root')
-        # check min dist
-        if r12_norm[int(roots[0]/dt)] < 2*radius:
-            r12_spline = make_interp_spline(t, r12_norm - 2*radius, k=3)
-            collision_time = sproot(r12_spline)[0]
-            print(sproot(r12_spline))
-        else:
-            # no collision
-            pass
-
-    return t, x1, v1, x2, v2, r12_norm, collision_time
-
-
 def collision_step(pos, vel, f, L):
 
     N = len(pos)
