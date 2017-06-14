@@ -68,7 +68,7 @@ def collision_step(pos, vel, f, L):
     if t_max == 0:
         return None, None, None, None
 
-    t = np.linspace(0, t_max, 3000)
+    t = np.linspace(0, t_max, 2000)
     dt = t[1]-t[0]
 
     trajectories = []
@@ -81,17 +81,20 @@ def collision_step(pos, vel, f, L):
 
     wall_collision_time = t_max
     wall_collision_idx = -1, -1
+    wall_dir = -1
     for i in range(N):
         for j in [0, 1]:
             if vel[i,j]>0:
                 x_spline = make_interp_spline(t, trajectories[i].x[:,j]+radius-L[0], k=3)
+                wall_dir = 1
             else:
                 x_spline = make_interp_spline(t, trajectories[i].x[:,j]-radius, k=3)
+                wall_dir = 0
             roots = sproot(x_spline)
             if len(roots)>0:
                 if roots[0]<wall_collision_time:
                     wall_collision_time = roots[0]
-                    wall_collision_idx = i, j
+                    wall_collision_idx = i, j, wall_dir
 
     collisions = []
     c_time = t_max
@@ -160,31 +163,45 @@ def collide(x1, v1, x2, v2):
     return v1 + kick*u12, v2 - kick*u12
 
 
-def full_step(pos, vel, f, L):
-    all_x = []
-    all_v = []
+def full_step(pos, vel, N_collisions, f, L, alpha=1):
     new_x = pos
     new_v = vel
-    all_x.append(new_x)
-    all_v.append(new_v)
-    for i in range(1000):
+    N = len(pos)
+    unique_t = []
+    unique_kin = []
+    store_t = [[0] for i in range(N)]
+    store_x = [[pos[i].copy()] for i in range(N)]
+    store_v = [[vel[i].copy()] for i in range(N)]
+    t = 0
+    tot_mom = np.zeros((2, 2))
+    for i in range(N_collisions):
         new_x, new_v, c_type, c_time, c_data = collision_step(new_x, new_v, f, L)
-        print(c_type, c_time)
+        t += c_time
+        unique_t.append(t)
+        unique_kin.append(np.sum(new_v**2)/(2*N))
         if c_data == (-1, -1):
             print('No more collisions')
             break
         if c_type == collision_types.DISKS:
-            print("c_data", c_data)
-            print("before collide")
-            print(new_x[c_data[0]], new_v[c_data[0]], new_x[c_data[1]], new_v[c_data[1]])
+            i1, i2 = c_data
             new_v1, new_v2 = collide(new_x[c_data[0]], new_v[c_data[0]], new_x[c_data[1]], new_v[c_data[1]])
-            print("after collide")
             new_v[c_data[0]] = new_v1
             new_v[c_data[1]] = new_v2
+            store_t[i1].append(t)
+            store_t[i2].append(t)
+            store_x[i1].append(new_x[i1])
+            store_x[i2].append(new_x[i2])
+            store_v[i1].append(new_x[i1])
+            store_v[i2].append(new_x[i2])
         elif c_type == collision_types.WALL:
-            print(new_x[c_data[0]], new_v[c_data[0]])
-            new_v[c_data[0],c_data[1]] *= -1
-        all_x.append(new_x)
-        all_v.append(new_v)
+            v = new_v[c_data[0],c_data[1]]
+            tot_mom[c_data[1], c_data[2]] += v
+            new_v[c_data[0],c_data[1]] = -alpha*v
+            store_t[c_data[0]].append(t)
+            store_x[c_data[0]].append(new_x[c_data[0]])
+            store_v[c_data[0]].append(new_v[c_data[0]])
 
-    return np.array(all_x), np.array(all_v)
+    store_x = [np.array(store_x[i]) for i in range(N)]
+    store_v = [np.array(store_v[i]) for i in range(N)]
+
+    return np.array(unique_t), np.array(unique_kin), store_t, store_x, store_v, t, tot_mom
