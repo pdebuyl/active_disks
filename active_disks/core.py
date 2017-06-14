@@ -205,3 +205,17 @@ def full_step(pos, vel, N_collisions, f, L, alpha=1):
     store_v = [np.array(store_v[i]) for i in range(N)]
 
     return np.array(unique_t), np.array(unique_kin), store_t, store_x, store_v, t, tot_mom
+
+def draw_t_x(tt, xx):
+    import matplotlib.pyplot as plt
+    # make a set of unique collision times
+    a = set(tt[0])
+    for t_elem in tt[1:]:
+        a.update(set(t_elem))
+
+    ax1 = plt.subplot(211)
+    [plt.plot(tt[i], xx[i][:,0]) for i in range(9)]
+    [plt.axvline(t) for t in a]
+    ax2 = plt.subplot(212, sharex=ax1)
+    [plt.plot(tt[i], xx[i][:,1]) for i in range(9)]
+    [plt.axvline(t) for t in a]
