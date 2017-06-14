@@ -1,0 +1,5 @@
+*~
+build/
+dist/
+*.pyc
+active_disks.egg-info
