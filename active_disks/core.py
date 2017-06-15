@@ -3,6 +3,7 @@ import math
 
 from scipy.integrate import odeint
 from scipy.interpolate import BSpline, interp1d, sproot, make_interp_spline
+from scipy.spatial.distance import pdist
 
 import itertools
 from collections import namedtuple
@@ -33,6 +34,7 @@ def collision_step(pos, vel, f, L):
 
     N = len(pos)
     radius = 0.5
+    L_max = max(*L)*math.sqrt(2)
 
     t_max = 0
     pairs = []
@@ -41,30 +43,40 @@ def collision_step(pos, vel, f, L):
         r12 = pos[i1] - pos[i2]
         v1 = vel[i1]
         v2 = vel[i2]
-        unit_v2 = normalize(v2)
         v12 = v1-v2
-
 
         criterion = np.dot(r12, v12)
 
         if criterion<0:
-            pairs.append((i1, i2))
-
+            # compute the intersection of paths
             w1 = cross_onez(v1)
             w2 = cross_onez(v2)
 
             t1 = -np.dot(w2, r12)/np.dot(w2, v1)
             t2 = np.dot(w1, r12)/np.dot(w1, v2)
 
-            t_max = max(t_max, t1, t2)
+            # keep smallest of the two times where the disk has passed the intersection
+            # point plus a full diameter to avoid uselessly large values for t_max
+            t_local = min(
+                          t1 + 2*radius/norm2(v1),
+                          t2 + 2*radius/norm2(v2)
+                          )
+
+            # keep the collision only if it occurs inside of the box
+            if norm2(v1)*t1 < L_max and norm2(v2)*t2 < L_max:
+                pairs.append((i1, i2))
+                t_max = max(t_max, t_local)
 
     for i in range(N):
+        t_local = [0, 0]
         for j in [0, 1]:
             if vel[i,j]>0:
-                wall_t_max = (L[j]-pos[i,j])/vel[i,j]
+                t_local[j] = (L[j]-pos[i,j])/vel[i,j]
             else:
-                wall_t_max = pos[i,j]/vel[i,j]
-            t_max = max(wall_t_max, t_max)
+                t_local[j] = pos[i,j]/vel[i,j]
+        # keep only the earliest collision
+        t_local = min(t_local)
+        t_max = max(t_local, t_max)
 
     # also check wall collisions for tmax
 
@@ -114,7 +126,7 @@ def collision_step(pos, vel, f, L):
         collision_time = 0
         if len(roots)>0:
             if len(roots)!=1:
-                raise Exception('More than one root')
+                print(roots)
             # check min dist
             if r12_norm[int(roots[0]/dt)] < 2*radius:
                 r12_spline = make_interp_spline(t, r12_norm - 2*radius, k=3)
@@ -144,7 +156,7 @@ def collision_step(pos, vel, f, L):
         new_x.append(x)
         new_v.append(v)
 
-    return np.array(new_x), np.array(new_v), c_type, final_time, collision_data
+    return np.array(new_x), np.array(new_v), c_type, final_time, collision_data, t_max
 
 def draw_lines(x, v, t_max):
     import matplotlib.pyplot as plt
@@ -177,15 +189,20 @@ def full_step(pos, vel, N_collisions, f, L, alpha=1):
     store_v = [[vel[i].copy()] for i in range(N)]
     t = 0
     tot_mom = np.zeros((2, 2))
+    n_wall = 0
+    n_disk = 0
+    t_max_list = []
     for i in range(N_collisions):
-        new_x, new_v, c_type, c_time, c_data = collision_step(new_x, new_v, f, L)
+        new_x, new_v, c_type, c_time, c_data, t_max = collision_step(new_x, new_v, f, L)
         t += c_time
+        t_max_list.append(t_max)
         unique_t.append(t)
         unique_kin.append(np.sum(new_v**2)/(2*N))
         if c_data == (-1, -1):
             print('No more collisions')
             break
         if c_type == collision_types.DISKS:
+            n_disk = n_disk + 1
             i1, i2 = c_data
             new_v1, new_v2 = collide(new_x[c_data[0]], new_v[c_data[0]], new_x[c_data[1]], new_v[c_data[1]])
             new_v[c_data[0]] = new_v1
@@ -197,6 +214,7 @@ def full_step(pos, vel, N_collisions, f, L, alpha=1):
             store_v[i1].append(new_v[i1])
             store_v[i2].append(new_v[i2])
         elif c_type == collision_types.WALL:
+            n_wall = n_wall + 1
             v = new_v[c_data[0],c_data[1]]
             tot_mom[c_data[1], c_data[2]] += v
             new_v[c_data[0],c_data[1]] = -alpha*v
@@ -206,8 +224,10 @@ def full_step(pos, vel, N_collisions, f, L, alpha=1):
 
     store_x = [np.array(store_x[i]) for i in range(N)]
     store_v = [np.array(store_v[i]) for i in range(N)]
+    print(n_wall, 'collisions with the walls')
+    print(n_disk, 'collisions between disks')
 
-    return np.array(unique_t), np.array(unique_kin), store_t, store_x, store_v, t, tot_mom
+    return np.array(unique_t), np.array(unique_kin), store_t, store_x, store_v, t, tot_mom, t_max_list
 
 def draw_t_x(tt, xx):
     import matplotlib.pyplot as plt
