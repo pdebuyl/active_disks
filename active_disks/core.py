@@ -26,6 +26,9 @@ def solve_x_v(f, v0, t):
     trajectory = odeint(local_f, x0v0, t)
     return trajectory[:,0].reshape((-1,1)), trajectory[:,1].reshape((-1,1))
 
+def norm2(x):
+    return math.sqrt(x[0]**2+x[1]**2)
+
 def collision_step(pos, vel, f, L):
 
     N = len(pos)
