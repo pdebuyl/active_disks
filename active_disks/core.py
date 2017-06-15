@@ -222,3 +222,13 @@ def draw_t_x(tt, xx):
     ax2 = plt.subplot(212, sharex=ax1)
     [plt.plot(tt[i], xx[i][:,1]) for i in range(9)]
     [plt.axvline(t) for t in a]
+
+
+def generate_ic(N, L, radius):
+    L = np.array(L).reshape((1, 2))
+    while True:
+        x = radius + np.random.uniform(size=(N, 2)) * (L - 2*radius)
+        if np.min(pdist(x)) > 2*radius:
+            break
+    v = np.random.normal(size=(N, 2))
+    return x, v
