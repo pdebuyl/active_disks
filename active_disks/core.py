@@ -100,7 +100,7 @@ def collision_step(pos, vel, f, L):
     for i in range(N):
         for j in [0, 1]:
             if vel[i,j]>0:
-                x_spline = make_interp_spline(t, trajectories[i].x[:,j]+radius-L[0], k=3)
+                x_spline = make_interp_spline(t, trajectories[i].x[:,j]+radius-L[j], k=3)
                 wall_dir = 1
             else:
                 x_spline = make_interp_spline(t, trajectories[i].x[:,j]-radius, k=3)
