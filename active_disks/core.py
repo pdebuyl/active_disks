@@ -164,7 +164,7 @@ def draw_lines(x, v, t_max):
     t = np.linspace(0, t_max, 100)
     for i in range(len(x)):
         unit_v = normalize(v[i])
-        traj = x[i] + t.reshape((-1,1))*unit_v
+        traj = x[i] + t.reshape((-1,1))*v[i]
         plt.plot(traj[:,0], traj[:,1], label=str(i))
 
     plt.legend()
