@@ -194,8 +194,8 @@ def full_step(pos, vel, N_collisions, f, L, alpha=1):
             store_t[i2].append(t)
             store_x[i1].append(new_x[i1])
             store_x[i2].append(new_x[i2])
-            store_v[i1].append(new_x[i1])
-            store_v[i2].append(new_x[i2])
+            store_v[i1].append(new_v[i1])
+            store_v[i2].append(new_v[i2])
         elif c_type == collision_types.WALL:
             v = new_v[c_data[0],c_data[1]]
             tot_mom[c_data[1], c_data[2]] += v
