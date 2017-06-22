@@ -147,6 +147,9 @@ def collision_step(pos, vel, f, L):
 
     new_x = []
     new_v = []
+    if final_time>50:
+        c_type = collision_types.NULL
+        final_time = 50
     t = np.linspace(0, final_time, 2000)
     for i in range(N):
         x, v = solve_x_v(f, math.sqrt(vel[i, 0]**2+vel[i, 1]**2), t)
