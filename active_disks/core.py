@@ -126,15 +126,17 @@ def collision_step(pos, vel, f, L):
         collision_time = 0
         if len(roots)>0:
             if len(roots)!=1:
-                print(roots)
+                pass #print(roots)
             # check min dist
             if r12_norm[int(roots[0]/dt)] < 2*radius:
                 r12_spline = make_interp_spline(t, r12_norm - 2*radius, k=3)
-                collision_time = sproot(r12_spline)[0]
-                collisions.append((collision_time, i1, i2))
-                if collision_time < c_time:
-                    c_time = collision_time
-                    c_pair = (i1, i2)
+                collision_time = sproot(r12_spline)
+                if len(collision_time)>0:
+                    collision_time = collision_time[0]
+                    collisions.append((collision_time, i1, i2))
+                    if collision_time < c_time:
+                        c_time = collision_time
+                        c_pair = (i1, i2)
 
     c_type = collision_types.DISKS if c_time < wall_collision_time else collision_types.WALL
 
@@ -181,12 +183,18 @@ def collide(x1, v1, x2, v2):
     return v1 + kick*u12, v2 - kick*u12
 
 
-def full_step(pos, vel, N_collisions, f, L, alpha=1):
+def full_step(pos, vel, N_collisions, f, L, alpha=1, target_kinetic=None, damp_time=None):
+
+    if target_kinetic is not None:
+        assert damp_time is not None
+
     new_x = pos
     new_v = vel
     N = len(pos)
     unique_t = []
     unique_kin = []
+    inst_kin = 0
+    smooth_kin = []
     store_t = [[0] for i in range(N)]
     store_x = [[pos[i].copy()] for i in range(N)]
     store_v = [[vel[i].copy()] for i in range(N)]
@@ -195,12 +203,27 @@ def full_step(pos, vel, N_collisions, f, L, alpha=1):
     n_wall = 0
     n_disk = 0
     t_max_list = []
+    k_store = []
+    alpha_data = []
     for i in range(N_collisions):
         new_x, new_v, c_type, c_time, c_data, t_max = collision_step(new_x, new_v, f, L)
         t += c_time
         t_max_list.append(t_max)
         unique_t.append(t)
         unique_kin.append(np.sum(new_v**2)/(2*N))
+        loop_kin = np.sum(new_v**2)/(2*N)
+        inst_kin = (inst_kin*i + loop_kin) / (i+1)
+        smooth_kin.append(inst_kin)
+        k_store.append( (loop_kin + sum(k_store[-9:]))/10 )
+        # update alpha to aim for the target kinetic temperature
+        if target_kinetic is not None and i>20 and c_type != collision_types.NULL:
+            alpha = alpha + (target_kinetic-k_store[-1])/damp_time
+            alpha = min(alpha, 1)
+            alpha = max(0.01, alpha)
+
+        if target_kinetic is not None and i%100==0:
+            print(alpha)
+        alpha_data.append(alpha)
         if c_data == (-1, -1):
             print('No more collisions')
             break
@@ -230,7 +253,7 @@ def full_step(pos, vel, N_collisions, f, L, alpha=1):
     print(n_wall, 'collisions with the walls')
     print(n_disk, 'collisions between disks')
 
-    return np.array(unique_t), np.array(unique_kin), store_t, store_x, store_v, t, tot_mom, t_max_list
+    return np.array(unique_t), np.array(unique_kin), store_t, store_x, store_v, t, tot_mom, t_max_list, np.array(smooth_kin), alpha_data
 
 def draw_t_x(tt, xx):
     import matplotlib.pyplot as plt
