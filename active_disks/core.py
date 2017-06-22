@@ -73,7 +73,7 @@ def collision_step(pos, vel, f, L):
             if vel[i,j]>0:
                 t_local[j] = (L[j]-pos[i,j])/vel[i,j]
             else:
-                t_local[j] = pos[i,j]/vel[i,j]
+                t_local[j] = -pos[i,j]/vel[i,j]
         # keep only the earliest collision
         t_local = min(t_local)
         t_max = max(t_local, t_max)
